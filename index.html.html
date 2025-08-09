@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bot Commands</title>
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --primary-color: #00aaff;
+            --text-color: #f0f0f0;
+            --card-bg: #2c2c2c;
+            --card-border: #444;
+            --modal-bg: #252525;
+            --modal-header-bg: #333;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #sidebar {
+            width: 250px;
+            background-color: var(--card-bg);
+            padding: 20px;
+            border-right: 1px solid var(--card-border);
+            display: flex;
+            flex-direction: column;
+        }
+        #sidebar h2 {
+            color: var(--primary-color);
+            margin-top: 0;
+        }
+        #search-box {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid var(--card-border);
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        #category-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            overflow-y: auto;
+        }
+        #category-list li {
+            padding: 10px;
+            cursor: pointer;
+            border-radius: 5px;
+            margin-bottom: 5px;
+        }
+        #category-list li:hover, #category-list li.active {
+            background-color: var(--primary-color);
+            color: var(--bg-color);
+        }
+        #main-content {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        #command-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        .command-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 15px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .command-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0, 170, 255, 0.2);
+        }
+        .command-card h3 {
+            margin: 0 0 10px 0;
+            color: var(--primary-color);
+        }
+        .command-card p {
+            margin: 0;
+            font-size: 0.9em;
+            color: #ccc;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.7);
+        }
+        .modal-content {
+            background-color: var(--modal-bg);
+            margin: 10% auto;
+            padding: 0;
+            border: 1px solid var(--card-border);
+            width: 80%;
+            max-width: 600px;
+            border-radius: 8px;
+            animation: slide-in 0.3s;
+        }
+        @keyframes slide-in {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .modal-header {
+            padding: 15px 20px;
+            background-color: var(--modal-header-bg);
+            border-bottom: 1px solid var(--card-border);
+            border-radius: 8px 8px 0 0;
+        }
+        .modal-header h2 {
+            margin: 0;
+            color: var(--primary-color);
+        }
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .modal-body {
+            padding: 20px;
+        }
+        .modal-body p {
+            margin-top: 0;
+        }
+        .detail-label {
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-top: 15px;
+            display: block;
+        }
+        .usage-box {
+            background-color: var(--bg-color);
+            padding: 10px;
+            border-radius: 5px;
+            font-family: "Courier New", Courier, monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            background-color: var(--primary-color);
+            color: var(--bg-color);
+            font-size: 0.8em;
+            margin-right: 5px;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <h2>Categories</h2>
+        <input type="text" id="search-box" placeholder="Search commands...">
+        <ul id="category-list"></ul>
+    </div>
+
+    <div id="main-content">
+        <div id="command-grid"></div>
+    </div>
+
+    <div id="command-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="close-button">&times;</span>
+                <h2 id="modal-command-name"></h2>
+            </div>
+            <div class="modal-body">
+                <p id="modal-command-description"></p>
+                <span class="detail-label">Usage:</span>
+                <div id="modal-command-usage" class="usage-box"></div>
+                <div id="modal-aliases-container">
+                    <span class="detail-label">Aliases:</span>
+                    <div id="modal-command-aliases"></div>
+                </div>
+                <div id="modal-permissions-container">
+                    <span class="detail-label">Permissions:</span>
+                    <div id="modal-command-permissions"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const commandsData = [
+    {
+        "name": "dm",
+        "description": "DM a user",
+        "category": "admin",
+        "usage": "dm <user> <message>",
+        "aliases": [],
+        "permissions": [
+            "Administrator"
+        ]
+    },
+    {
+        "name": "addrole",
+        "description": "Add a role to a user",
+        "category": "admin",
+        "usage": "addrole <user> <role>",
+        "aliases": [],
+        "permissions": [
+            "ManageRoles"
+        ]
+    },
+    {
+        "name": "removerole",
+        "description": "Remove a role from a user",
+        "category": "admin",
+        "usage": "removerole <user> <role>",
+        "aliases": [],
+        "permissions": [
+            "ManageRoles"
+        ]
+    },
+    {
+        "name": "embed",
+        "description": "Create an embed message",
+        "category": "admin",
+        "usage": "embed <json>",
+        "aliases": [],
+        "permissions": [
+            "ManageMessages"
+        ]
+    },
+    {
+        "name": "say",
+        "description": "Make the bot say something",
+        "category": "admin",
+        "usage": "say <message>",
+        "aliases": [],
+        "permissions": [
+            "ManageMessages"
+        ]
+    },
+    {
+        "name": "purge",
+        "description": "Purge messages from a channel",
+        "category": "admin",
+        "usage": "purge <amount>",
+        "aliases": [],
+        "permissions": [
+            "ManageMessages"
+        ]
+    },
+    {
+        "name": "autorole",
+        "description": "Configure autorole for new members",
+        "category": "admin",
+        "usage": "autorole <role>",
+        "aliases": [],
+        "permissions": [
+            "ManageRoles"
+        ]
+    },
+    {
+        "name": "welcome",
+        "description": "Configure welcome messages",
+        "category": "admin",
+        "usage": "welcome <channel> <message>",
+        "aliases": [],
+        "permissions": [
+            "ManageGuild"
+        ]
+    },
+    {
+        "name": "goodbye",
+        "description": "Configure goodbye messages",
+        "category": "admin",
+        "usage": "goodbye <channel> <message>",
+        "aliases": [],
+        "permissions": [
+            "ManageGuild"
+        ]
+    },
+    {
+        "name": "reactionrole",
+        "description": "Create a reaction role message",
+        "category": "admin",
+        "usage": "reactionrole <channel> <messageID> <emoji> <role>",
+        "aliases": [],
+        "permissions": [
+            "ManageRoles"
+        ]
+    },
+    {
+        "name": "hug",
+        "description": "Hug someone",
+        "category": "anime",
+        "usage": "hug <user>",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "kiss",
+        "description": "Kiss someone",
+        "category": "anime",
+        "usage": "kiss <user>",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "slap",
+        "description": "Slap someone",
+        "category": "anime",
+        "usage": "slap <user>",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "pat",
+        "description": "Pat someone",
+        "category": "anime",
+        "usage": "pat <user>",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "neko",
+        "description": "Get a random neko image",
+        "category": "anime",
+        "usage": "neko",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "waifu",
+        "description": "Get a random waifu image",
+        "category": "anime",
+        "usage": "waifu",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "meme",
+        "description": "Get a random meme",
+        "category": "fun",
+        "usage": "meme",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "8ball",
+        "description": "Ask the magic 8ball a question",
+        "category": "fun",
+        "usage": "8ball <question>",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "coinflip",
+        "description": "Flip a coin",
+        "category": "fun",
+        "usage": "coinflip",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "roll",
+        "description": "Roll a dice",
+        "category": "fun",
+        "usage": "roll [number of sides]",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "rps",
+        "description": "Play rock, paper, scissors",
+        "category": "fun",
+        "usage": "rps <rock|paper|scissors>",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "cat",
+        "description": "Get a random cat picture",
+        "category": "image",
+        "usage": "cat",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "dog",
+        "description": "Get a random dog picture",
+        "category": "image",
+        "usage": "dog",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "avatar",
+        "description": "Get a user's avatar",
+        "category": "image",
+        "usage": "avatar [user]",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "play",
+        "description": "Play a song from YouTube",
+        "category": "music",
+        "usage": "play <song name or url>",
+        "aliases": [
+            "p"
+        ],
+        "permissions": []
+    },
+    {
+        "name": "skip",
+        "description": "Skip the current song",
+        "category": "music",
+        "usage": "skip",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "stop",
+        "description": "Stop the music and leave the channel",
+        "category": "music",
+        "usage": "stop",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "queue",
+        "description": "Show the song queue",
+        "category": "music",
+        "usage": "queue",
+        "aliases": [
+            "q"
+        ],
+        "permissions": []
+    },
+    {
+        "name": "np",
+        "description": "Show the currently playing song",
+        "category": "music",
+        "usage": "np",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "volume",
+        "description": "Change the music volume",
+        "category": "music",
+        "usage": "volume <1-100>",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "eval",
+        "description": "Evaluate javascript code",
+        "category": "owner",
+        "usage": "eval <code>",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "reload",
+        "description": "Reload a command",
+        "category": "owner",
+        "usage": "reload <command>",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "exec",
+        "description": "Execute a shell command",
+        "category": "owner",
+        "usage": "exec <command>",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "botstats",
+        "description": "Shows the bot's statistics.",
+        "category": "stats",
+        "usage": "botstats",
+        "aliases": [
+            "bs"
+        ],
+        "permissions": []
+    },
+    {
+        "name": "serverstats",
+        "description": "Shows the server's statistics.",
+        "category": "stats",
+        "usage": "serverstats",
+        "aliases": [
+            "ss"
+        ],
+        "permissions": []
+    },
+    {
+        "name": "userinfo",
+        "description": "Shows a user's information.",
+        "category": "stats",
+        "usage": "userinfo [user]",
+        "aliases": [
+            "ui"
+        ],
+        "permissions": []
+    },
+    {
+        "name": "profile",
+        "description": "Shows your social profile.",
+        "category": "social",
+        "usage": "profile",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "rep",
+        "description": "Give a reputation point to a user.",
+        "category": "social",
+        "usage": "rep <user>",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "setbio",
+        "description": "Set your profile biography.",
+        "category": "social",
+        "usage": "setbio <text>",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "ticket",
+        "description": "Create a new support ticket.",
+        "category": "ticket",
+        "usage": "ticket",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "close",
+        "description": "Close a support ticket.",
+        "category": "ticket",
+        "usage": "close",
+        "aliases": [],
+        "permissions": [
+            "ManageChannels"
+        ]
+    },
+    {
+        "name": "balance",
+        "description": "Check your balance.",
+        "category": "economy",
+        "usage": "balance",
+        "aliases": [
+            "bal"
+        ],
+        "permissions": []
+    },
+    {
+        "name": "daily",
+        "description": "Claim your daily reward.",
+        "category": "economy",
+        "usage": "daily",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "work",
+        "description": "Work to earn money.",
+        "category": "economy",
+        "usage": "work",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "pay",
+        "description": "Pay another user.",
+        "category": "economy",
+        "usage": "pay <user> <amount>",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "leaderboard",
+        "description": "Show the economy leaderboard.",
+        "category": "economy",
+        "usage": "leaderboard",
+        "aliases": [
+            "lb"
+        ],
+        "permissions": []
+    },
+    {
+        "name": "invites",
+        "description": "Shows your invite count.",
+        "category": "invites",
+        "usage": "invites",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "help",
+        "description": "Shows the help menu.",
+        "category": "utility",
+        "usage": "help [command]",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "ping",
+        "description": "Checks the bot's latency.",
+        "category": "utility",
+        "usage": "ping",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "uptime",
+        "description": "Shows the bot's uptime.",
+        "category": "utility",
+        "usage": "uptime",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "gstart",
+        "description": "Starts a giveaway.",
+        "category": "giveaways",
+        "usage": "gstart <duration> <winners> <prize>",
+        "aliases": [],
+        "permissions": [
+            "ManageMessages"
+        ]
+    },
+    {
+        "name": "greroll",
+        "description": "Rerolls a giveaway winner.",
+        "category": "giveaways",
+        "usage": "greroll <messageID>",
+        "aliases": [],
+        "permissions": [
+            "ManageMessages"
+        ]
+    },
+    {
+        "name": "gend",
+        "description": "Ends a giveaway.",
+        "category": "giveaways",
+        "usage": "gend <messageID>",
+        "aliases": [],
+        "permissions": [
+            "ManageMessages"
+        ]
+    },
+    {
+        "name": "ban",
+        "description": "Bans a user from the server.",
+        "category": "moderation",
+        "usage": "ban <user> [reason]",
+        "aliases": [],
+        "permissions": [
+            "BanMembers"
+        ]
+    },
+    {
+        "name": "kick",
+        "description": "Kicks a user from the server.",
+        "category": "moderation",
+        "usage": "kick <user> [reason]",
+        "aliases": [],
+        "permissions": [
+            "KickMembers"
+        ]
+    },
+    {
+        "name": "mute",
+        "description": "Mutes a user.",
+        "category": "moderation",
+        "usage": "mute <user> [reason]",
+        "aliases": [],
+        "permissions": [
+            "ManageRoles"
+        ]
+    },
+    {
+        "name": "unmute",
+        "description": "Unmutes a user.",
+        "category": "moderation",
+        "usage": "unmute <user>",
+        "aliases": [],
+        "permissions": [
+            "ManageRoles"
+        ]
+    },
+    {
+        "name": "warn",
+        "description": "Warns a user.",
+        "category": "moderation",
+        "usage": "warn <user> [reason]",
+        "aliases": [],
+        "permissions": [
+            "KickMembers"
+        ]
+    },
+    {
+        "name": "warnings",
+        "description": "Shows a user's warnings.",
+        "category": "moderation",
+        "usage": "warnings [user]",
+        "aliases": [],
+        "permissions": [
+            "KickMembers"
+        ]
+    },
+    {
+        "name": "clearwarnings",
+        "description": "Clears a user's warnings.",
+        "category": "moderation",
+        "usage": "clearwarnings <user>",
+        "aliases": [
+            "cw"
+        ],
+        "permissions": [
+            "KickMembers"
+        ]
+    },
+    {
+        "name": "serverinfo",
+        "description": "Shows information about the server.",
+        "category": "information",
+        "usage": "serverinfo",
+        "aliases": [
+            "si"
+        ],
+        "permissions": []
+    },
+    {
+        "name": "roleinfo",
+        "description": "Shows information about a role.",
+        "category": "information",
+        "usage": "roleinfo <role>",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "channelinfo",
+        "description": "Shows information about a channel.",
+        "category": "information",
+        "usage": "channelinfo [channel]",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "suggest",
+        "description": "Make a suggestion.",
+        "category": "suggestions",
+        "usage": "suggest <suggestion>",
+        "aliases": [],
+        "permissions": []
+    },
+    {
+        "name": "approve",
+        "description": "Approve a suggestion.",
+        "category": "suggestions",
+        "usage": "approve <messageID> [reason]",
+        "aliases": [],
+        "permissions": [
+            "ManageGuild"
+        ]
+    },
+    {
+        "name": "deny",
+        "description": "Deny a suggestion.",
+        "category": "suggestions",
+        "usage": "deny <messageID> [reason]",
+        "aliases": [],
+        "permissions": [
+            "ManageGuild"
+        ]
+    }
+];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const commandGrid = document.getElementById('command-grid');
+            const categoryList = document.getElementById('category-list');
+            const searchBox = document.getElementById('search-box');
+            const modal = document.getElementById('command-modal');
+            const closeModalButton = document.querySelector('.close-button');
+
+            const categories = ['All', ...new Set(commandsData.map(c => c.category))];
+            let activeCategory = 'All';
+
+            function renderCategories() {
+                categoryList.innerHTML = '';
+                categories.forEach(category => {
+                    const li = document.createElement('li');
+                    li.textContent = category.charAt(0).toUpperCase() + category.slice(1);
+                    li.dataset.category = category;
+                    if (category === activeCategory) {
+                        li.classList.add('active');
+                    }
+                    li.addEventListener('click', () => {
+                        activeCategory = category;
+                        renderCategories();
+                        renderCommands();
+                    });
+                    categoryList.appendChild(li);
+                });
+            }
+
+            function renderCommands() {
+                commandGrid.innerHTML = '';
+                const searchTerm = searchBox.value.toLowerCase();
+
+                const filteredCommands = commandsData.filter(command => {
+                    const inCategory = activeCategory === 'All' || command.category === activeCategory;
+                    const matchesSearch = command.name.toLowerCase().includes(searchTerm) || command.description.toLowerCase().includes(searchTerm);
+                    return inCategory && matchesSearch;
+                });
+
+                filteredCommands.forEach(command => {
+                    const card = document.createElement('div');
+                    card.className = 'command-card';
+                    card.innerHTML = `
+                        <h3>${command.name}</h3>
+                        <p>${command.description}</p>
+                    `;
+                    card.addEventListener('click', () => openModal(command));
+                    commandGrid.appendChild(card);
+                });
+            }
+
+            function openModal(command) {
+                document.getElementById('modal-command-name').textContent = command.name;
+                document.getElementById('modal-command-description').textContent = command.description;
+                document.getElementById('modal-command-usage').textContent = command.usage;
+
+                const aliasesContainer = document.getElementById('modal-aliases-container');
+                const aliasesDiv = document.getElementById('modal-command-aliases');
+                if (command.aliases && command.aliases.length > 0) {
+                    aliasesDiv.innerHTML = command.aliases.map(a => `<span class="badge">${a}</span>`).join('');
+                    aliasesContainer.style.display = 'block';
+                } else {
+                    aliasesContainer.style.display = 'none';
+                }
+
+                const permissionsContainer = document.getElementById('modal-permissions-container');
+                const permissionsDiv = document.getElementById('modal-command-permissions');
+                if (command.permissions && command.permissions.length > 0) {
+                    permissionsDiv.innerHTML = command.permissions.map(p => `<span class="badge">${p}</span>`).join('');
+                    permissionsContainer.style.display = 'block';
+                } else {
+                    permissionsContainer.style.display = 'none';
+                }
+
+                modal.style.display = 'block';
+            }
+
+            closeModalButton.addEventListener('click', () => {
+                modal.style.display = 'none';
+            });
+
+            window.addEventListener('click', (event) => {
+                if (event.target === modal) {
+                    modal.style.display = 'none';
+                }
+            });
+            
+            searchBox.addEventListener('input', renderCommands);
+
+            renderCategories();
+            renderCommands();
+        });
+    </script>
+
+</body>
+</html>
